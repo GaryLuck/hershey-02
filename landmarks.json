@@ -1,0 +1,48 @@
+[
+  {
+    "id": 1,
+    "title": "Original Hershey Chocolate Factory",
+    "shortTitle": "Chocolate Factory",
+    "year": "c. 1915",
+    "lat": 40.285,
+    "lng": -76.651,
+    "history": "Built in 1905, the heart of Milton Hershey's chocolate empire. The smokestacks became a town landmark and could be seen for miles. Workers arrived by trolley each morning to make the chocolate that built a town.",
+    "historicLabel": "Chocolate Factory Workers",
+    "modernLabel": "Factory Site Today"
+  },
+  {
+    "id": 2,
+    "title": "Hershey Park Entrance (1907)",
+    "shortTitle": "Hershey Park",
+    "year": "c. 1907",
+    "lat": 40.2859,
+    "lng": -76.655,
+    "history": "Originally Hershey Park was a leisure park for factory workers, opened in 1907 with a pavilion. Milton Hershey believed happy workers made better chocolate. What started as a picnic ground grew into the amusement park we know today.",
+    "historicLabel": "Park Pavilion Entrance",
+    "modernLabel": "Hersheypark Entrance Today"
+  },
+  {
+    "id": 3,
+    "title": "High Point Mansion - Milton Hershey's Home",
+    "shortTitle": "High Point Mansion",
+    "year": "c. 1910",
+    "lat": 40.2775,
+    "lng": -76.6495,
+    "history": "Completed in 1908, this is where Milton and Catherine Hershey entertained guests and planned the town. From this hilltop they could overlook the factory, the town, and the school they founded for orphaned boys.",
+    "historicLabel": "High Point - The Hershey Home",
+    "modernLabel": "Mansion Grounds Today",
+    "thenImage": "images/mansion-then.png",
+    "nowImage": "images/mansion-now.png"
+  },
+  {
+    "id": 4,
+    "title": "Hershey Chocolate World original site / Community Building",
+    "shortTitle": "Community Building",
+    "year": "c. 1932",
+    "lat": 40.2839,
+    "lng": -76.643,
+    "history": "The Community Building opened in 1932 as the social heart of Hershey. It housed a theater, library, hospital, and school. The original Chocolate World welcome center was nearby, introducing visitors to the story of chocolate.",
+    "historicLabel": "Community Building",
+    "modernLabel": "Chocolate World Area Today"
+  }
+]
