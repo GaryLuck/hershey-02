@@ -213,3 +213,20 @@
   flex: 1 1 auto;
   height: auto !important;
 }
+
+/* Discoverability nudge on the clue photo, so volunteers know the historic
+   image can be wiped away. Sits under the range input so it never blocks a drag. */
+.hhh-comparison-hint {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 2;
+  border-radius: 9999px;
+  background: rgba(60, 36, 21, 0.85);
+  padding: 0.3rem 0.7rem;
+  color: #fff8e7;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  pointer-events: none;
+}

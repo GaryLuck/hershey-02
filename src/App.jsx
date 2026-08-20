@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
+import ThenNowSlider from "./ThenNowSlider.jsx";
 import {
   ArrowRight,
   Award,
@@ -88,7 +89,9 @@ export default function App() {
   const [lastPoints, setLastPoints] = useState(0);
   const [landmarks, setLandmarks] = useState(null);
   const [loadError, setLoadError] = useState(null);
+  // The clue photo starts fully historic; the reveal starts split down the middle.
   const [sliderValue, setSliderValue] = useState(50);
+  const [clueSliderValue, setClueSliderValue] = useState(100);
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [isStoryExpanded, setIsStoryExpanded] = useState(false);
 
@@ -274,6 +277,9 @@ export default function App() {
     );
   }
 
+  // Only sites with both photos can offer a Then & Now comparison.
+  const hasPairedPhotos = Boolean(site.thenImage && site.nowImage);
+
   // Long-form text is optional per landmark; blank lines separate paragraphs.
   const storyParagraphs = (site.fullHistory || site.history)
     .split(/\n\s*\n/)
@@ -282,6 +288,7 @@ export default function App() {
 
   const startHunt = () => {
     setSliderValue(50);
+    setClueSliderValue(100);
     setPhase("playing");
   };
 
@@ -328,6 +335,7 @@ export default function App() {
     }
     setGuess(null);
     setSliderValue(50);
+    setClueSliderValue(100);
 
     if (roundIndex < landmarks.length - 1) {
       setRoundIndex((i) => i + 1);
@@ -348,6 +356,7 @@ export default function App() {
     setDistances([]);
     setGuess(null);
     setSliderValue(50);
+    setClueSliderValue(100);
     setPhase("intro");
     if (mapRef.current) {
       mapRef.current.remove();
@@ -509,30 +518,42 @@ export default function App() {
               <div className="hhh-game-content space-y-4">
                 {phase === "playing" && (
                   <div className="rounded-[20px] overflow-hidden border-[6px] border-white shadow-[0_12px_32px_rgba(60,36,21,0.15)] bg-[#efe0c6]">
-                    <div
-                      className="relative w-full bg-gradient-to-br from-[#d4a574] via-[#b88a5a] to-[#8b5a2b]"
-                      style={{ height: "clamp(240px, 40vh, 460px)" }}
-                    >
-                      {site.thenImage && (
-                        <img
-                          src={site.thenImage}
-                          alt={`Historic image of ${site.historicLabel}`}
-                          className="absolute inset-0 h-full w-full object-cover sepia"
+                    {hasPairedPhotos ? (
+                      <ThenNowSlider
+                        site={site}
+                        value={clueSliderValue}
+                        onChange={setClueSliderValue}
+                        hint="DRAG TO SEE TODAY"
+                        label="Reveal today's view of this site"
+                        className="w-full bg-gradient-to-br from-[#d4a574] via-[#b88a5a] to-[#8b5a2b]"
+                        style={{ height: "clamp(240px, 40vh, 460px)" }}
+                      />
+                    ) : (
+                      <div
+                        className="relative w-full bg-gradient-to-br from-[#d4a574] via-[#b88a5a] to-[#8b5a2b]"
+                        style={{ height: "clamp(240px, 40vh, 460px)" }}
+                      >
+                        {site.thenImage && (
+                          <img
+                            src={site.thenImage}
+                            alt={`Historic image of ${site.historicLabel}`}
+                            className="absolute inset-0 h-full w-full object-cover sepia"
+                          />
+                        )}
+                        <div
+                          className="absolute inset-0 opacity-20 mix-blend-multiply"
+                          style={{
+                            backgroundImage:
+                              "radial-gradient(circle at 30% 20%, #fff8e7 0%, transparent 40%), radial-gradient(circle at 80% 80%, #3c2415 0%, transparent 30%)",
+                          }}
                         />
-                      )}
-                      <div
-                        className="absolute inset-0 opacity-20 mix-blend-multiply"
-                        style={{
-                          backgroundImage:
-                            "radial-gradient(circle at 30% 20%, #fff8e7 0%, transparent 40%), radial-gradient(circle at 80% 80%, #3c2415 0%, transparent 30%)",
-                        }}
-                      />
-                      <div
-                        className="absolute inset-0 bg-[#fff8e7]/10"
-                        style={{ filter: "sepia(0.7) contrast(1.1)" }}
-                      />
-                      <div className="pointer-events-none absolute inset-0 rounded-[14px] shadow-[inset_0_0_120px_rgba(60,36,21,0.5)]" />
-                    </div>
+                        <div
+                          className="absolute inset-0 bg-[#fff8e7]/10"
+                          style={{ filter: "sepia(0.7) contrast(1.1)" }}
+                        />
+                        <div className="pointer-events-none absolute inset-0 rounded-[14px] shadow-[inset_0_0_120px_rgba(60,36,21,0.5)]" />
+                      </div>
+                    )}
 
                     <div className="bg-[#fff8e7] p-5 md:p-6 text-center">
                       <div className="inline-block bg-[#3c2415] text-[#fff8e7] text-[10px] font-black tracking-[0.2em] px-3 py-1 rounded-full mb-3">
@@ -558,45 +579,15 @@ export default function App() {
 
                 {phase === "result" && (
                   <div className="rounded-[20px] overflow-hidden border border-[#d4a574]/40 bg-white shadow-[0_12px_32px_rgba(60,36,21,0.12)]">
-                    <div
-                      className="hhh-result-image hhh-comparison relative bg-gradient-to-br from-[#a8c686] via-[#d4a574] to-[#fff8e7]"
+                    <ThenNowSlider
+                      site={site}
+                      value={sliderValue}
+                      onChange={setSliderValue}
+                      className="hhh-result-image bg-gradient-to-br from-[#a8c686] via-[#d4a574] to-[#fff8e7]"
                       style={{
                         height: "clamp(150px, calc(45vh - 200px), 280px)",
                       }}
-                    >
-                      {site.nowImage && (
-                        <img
-                          src={site.nowImage}
-                          alt={`Current image of ${site.modernLabel}`}
-                          className="absolute inset-0 h-full w-full object-cover"
-                        />
-                      )}
-                      {site.thenImage && (
-                        <img
-                          src={site.thenImage}
-                          alt={`Historic image of ${site.historicLabel}`}
-                          className="hhh-comparison-then absolute inset-0 h-full w-full object-cover sepia"
-                          style={{
-                            clipPath: `inset(0 ${100 - sliderValue}% 0 0)`,
-                          }}
-                        />
-                      )}
-                      <div
-                        className="hhh-comparison-divider"
-                        style={{ left: `${sliderValue}%` }}
-                      >
-                        <span className="hhh-comparison-handle">{"<>"}</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={sliderValue}
-                        onChange={(e) => setSliderValue(Number(e.target.value))}
-                        aria-label="Reveal historic and current photos"
-                        className="hhh-comparison-range"
-                      />
-                    </div>
+                    />
 
                     <div className="hhh-comparison-captions grid grid-cols-2 border-t border-[#d4a574]/30">
                       <div className="hhh-result-caption bg-[#fff8e7] text-center flex flex-col items-center justify-center">
