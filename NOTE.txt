@@ -1,0 +1,5 @@
+
+GitHub and Netlify builds work fine. On laptop say:
+
+
+$env:VITE_BASE_PATH = "/hershey-02/"; npx vite build
