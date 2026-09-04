@@ -1,7 +1,7 @@
 # Site Photos
 
 Photos are referenced from `public/landmarks.json` by the `thenImage` and
-`nowImage` fields, as paths like `images/hocker-house-then.png`.
+`nowImage` fields, as paths like `images/hocker-house-then.jpg`.
 
 A site needs **both** a `thenImage` and a `nowImage` to show the Then & Now
 slider. With only one photo it displays that photo alone; with none it falls
@@ -11,17 +11,17 @@ back to a decorative gradient.
 
 | Site | then | now |
 |---|---|---|
-| Hotel Hershey | `hotel-hershey-then.png` | `hotel-hershey-now.png` |
-| 743 & Cocoa | `cocoa-743-then.png` | `cocoa-743-now.png` |
-| State Police Academy | `police-academy-then.png` | `police-academy-now.png` |
-| Hocker House | `hocker-house-then.png` | *missing* |
+| Hotel Hershey | `hotel-hershey-then.jpg` | `hotel-hershey-now.jpg` |
+| 743 & Cocoa | `cocoa-743-then.jpg` | `cocoa-743-now.jpg` |
+| State Police Academy | `police-academy-then.jpg` | `police-academy-now.jpg` |
+| Hocker House | `hocker-house-then.jpg` | *missing* |
 
 ## Staged but not yet in the game
 
 These files are in this folder and referenced by nothing. They are waiting on
 the missing pieces listed below.
 
-- `round-barn-then.png` — needs latitude/longitude and a present-day photo.
+- `round-barn-then.jpg` — needs latitude/longitude and a present-day photo.
 - `decarlos-then.jpg` — needs latitude/longitude, a present-day photo, and its
   own descriptive text. The `DeCarlos.docx` supplied with it was a byte-for-byte
   duplicate of `Hocker House.docx`, so no DeCarlo's text exists yet.

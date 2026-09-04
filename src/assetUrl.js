@@ -3,7 +3,7 @@
  *
  * Vite fills in import.meta.env.BASE_URL at build time: "/" for local dev and
  * Netlify, "/hershey-02/" when the GitHub Pages workflow builds. Without this,
- * "images/foo.png" resolves against the current page URL, which breaks as soon
+ * "images/foo.jpg" resolves against the current page URL, which breaks as soon
  * as the app is served from a subfolder.
  */
 export function assetUrl(path) {
