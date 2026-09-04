@@ -5,6 +5,8 @@
  * Falls back to whichever single photo exists when a landmark has only one, so
  * a site with no paired images renders the same as it did before the slider.
  */
+import { assetUrl } from "./assetUrl.js";
+
 export default function ThenNowSlider({
   site,
   value,
@@ -20,14 +22,14 @@ export default function ThenNowSlider({
     <div className={`hhh-comparison relative ${className}`} style={style}>
       {site.nowImage && (
         <img
-          src={site.nowImage}
+          src={assetUrl(site.nowImage)}
           alt={`Current image of ${site.modernLabel}`}
           className="absolute inset-0 h-full w-full object-cover"
         />
       )}
       {site.thenImage && (
         <img
-          src={site.thenImage}
+          src={assetUrl(site.thenImage)}
           alt={`Historic image of ${site.historicLabel}`}
           className="hhh-comparison-then absolute inset-0 h-full w-full object-cover sepia"
           style={hasBoth ? { clipPath: `inset(0 ${100 - value}% 0 0)` } : undefined}

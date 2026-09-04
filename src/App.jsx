@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import ThenNowSlider from "./ThenNowSlider.jsx";
+import { assetUrl } from "./assetUrl.js";
 import {
   ArrowRight,
   Award,
@@ -143,7 +144,7 @@ export default function App() {
   // Load the landmark data.
   useEffect(() => {
     let cancelled = false;
-    fetch("./landmarks.json")
+    fetch(assetUrl("landmarks.json"))
       .then((res) => {
         if (!res.ok) throw Error("Unable to load landmark data");
         return res.json();
@@ -644,7 +645,7 @@ export default function App() {
                   >
                     {site.thenImage && (
                       <img
-                        src={site.thenImage}
+                        src={assetUrl(site.thenImage)}
                         alt="Historic photograph of the site you are trying to place"
                         className="absolute inset-0 h-full w-full object-cover sepia"
                       />
