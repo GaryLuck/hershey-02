@@ -5,8 +5,10 @@ import {
   ArrowRight,
   Award,
   BookOpen,
+  Calendar,
   Camera,
   Clock,
+  Images,
   Info,
   MapPin,
   Maximize2,
@@ -18,7 +20,6 @@ import {
 
 const HERSHEY_CENTER = [40.2859, -76.6503];
 const DEFAULT_ZOOM = 14;
-const MAX_POINTS_PER_SITE = 1000;
 
 // Derry Township, Dauphin County PA — the whole township is framed when the
 // map is expanded. Bounds from OpenStreetMap's administrative boundary.
@@ -26,6 +27,34 @@ const DERRY_TOWNSHIP_BOUNDS = [
   [40.2286, -76.7372], // south-west
   [40.3396, -76.592], // north-east
 ];
+
+// --- Scoring -----------------------------------------------------------
+// Location: 1000 points, less 100 for every tenth of a mile off.
+// Year:      100 points, less 1 for every year off.
+const METERS_PER_MILE = 1609.344;
+const MAX_LOCATION_POINTS = 1000;
+const MAX_YEAR_POINTS = 100;
+const POINTS_PER_TENTH_MILE = 100;
+const MAX_POINTS_PER_SITE = MAX_LOCATION_POINTS + MAX_YEAR_POINTS;
+
+/** Tenths of a mile, rounded down so a partial tenth is never charged. */
+function tenthsOfAMile(meters) {
+  return Math.floor((meters / METERS_PER_MILE) * 10);
+}
+
+function locationPointsFor(meters) {
+  return Math.max(
+    0,
+    MAX_LOCATION_POINTS - tenthsOfAMile(meters) * POINTS_PER_TENTH_MILE,
+  );
+}
+
+/** Full credit when the archive has no date on file for the photo. */
+function yearPointsFor(guessYear, photoYear) {
+  if (photoYear == null) return MAX_YEAR_POINTS;
+  if (guessYear == null) return 0;
+  return Math.max(0, MAX_YEAR_POINTS - Math.abs(guessYear - photoYear));
+}
 
 /** Great-circle distance between two lat/lng pairs, in meters. */
 function haversineMeters(lat1, lng1, lat2, lng2) {
@@ -72,10 +101,13 @@ function summaryFor(totalScore) {
   return "Nice start! Hershey's history hides in plain sight. Walk the town and you'll spot clues everywhere.";
 }
 
+const ARCHIVE_URL = "https://hersheyhistory.pastperfectonline.com/";
+
 const INTRO_STEPS = [
   { n: "1", t: "Study the Photo", d: "Note buildings, hills, and year." },
   { n: "2", t: "Drop Your Pin", d: "Click the map to place your guess." },
-  { n: "3", t: "Learn the Story", d: "See Then & Now and the history." },
+  { n: "3", t: "Guess the Year", d: "Type the year you think it was taken." },
+  { n: "4", t: "Learn the Story", d: "See Then & Now and the history." },
 ];
 
 export default function App() {
@@ -83,15 +115,16 @@ export default function App() {
   const [phase, setPhase] = useState("intro");
   const [roundIndex, setRoundIndex] = useState(0);
   const [guess, setGuess] = useState(null);
+  const [yearGuess, setYearGuess] = useState("");
   const [scores, setScores] = useState([]);
   const [distances, setDistances] = useState([]);
   const [lastDistance, setLastDistance] = useState(0);
-  const [lastPoints, setLastPoints] = useState(0);
+  const [lastLocationPoints, setLastLocationPoints] = useState(0);
+  const [lastYearPoints, setLastYearPoints] = useState(0);
+  const [lastYearGuess, setLastYearGuess] = useState(null);
   const [landmarks, setLandmarks] = useState(null);
   const [loadError, setLoadError] = useState(null);
-  // The clue photo starts fully historic; the reveal starts split down the middle.
   const [sliderValue, setSliderValue] = useState(50);
-  const [clueSliderValue, setClueSliderValue] = useState(100);
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [isStoryExpanded, setIsStoryExpanded] = useState(false);
 
@@ -133,13 +166,12 @@ export default function App() {
     };
   }, []);
 
-  // Build a fresh map for each round.
+  // Build a fresh map for each round, and again when the phase swaps the map
+  // between the guess layout and the answer layout.
   useEffect(() => {
     if (!mapContainerRef.current || phase === "intro" || phase === "finished")
       return;
 
-    // Tear down any previous map before replacing it. Cleanup deliberately
-    // leaves the map alive, so the round-advance recenter can still reach it.
     if (mapRef.current) {
       mapRef.current.remove();
       mapRef.current = null;
@@ -219,7 +251,6 @@ export default function App() {
     const map = mapRef.current;
     if (!map || (!isMapExpanded && !wasExpanded)) return;
 
-    // Let the new layout settle before Leaflet reads the container size.
     const timer = setTimeout(() => {
       map.invalidateSize();
       if (isMapExpanded) {
@@ -277,18 +308,22 @@ export default function App() {
     );
   }
 
-  // Only sites with both photos can offer a Then & Now comparison.
-  const hasPairedPhotos = Boolean(site.thenImage && site.nowImage);
-
-  // Long-form text is optional per landmark; blank lines separate paragraphs.
-  const storyParagraphs = (site.fullHistory || site.history)
+  // The archive often has no date for a photo; that reads as "Date unknown"
+  // everywhere and scores full year credit.
+  const displayYear =
+    site.photoYear == null ? "Date unknown" : String(site.photoYear);
+  const archiveLinks = site.archiveLinks || [];
+  const historyText = site.history?.trim() || "No history provided.";
+  const storyParagraphs = (site.fullHistory || historyText)
     .split(/\n\s*\n/)
     .map((paragraph) => paragraph.trim())
     .filter(Boolean);
 
+  const milesOff = tenthsOfAMile(lastDistance) / 10;
+  const lastTotal = lastLocationPoints + lastYearPoints;
+
   const startHunt = () => {
     setSliderValue(50);
-    setClueSliderValue(100);
     setPhase("playing");
   };
 
@@ -306,11 +341,16 @@ export default function App() {
   const lockInGuess = () => {
     if (!guess) return;
     const distance = haversineMeters(guess.lat, guess.lng, site.lat, site.lng);
-    const points = Math.max(0, Math.round(MAX_POINTS_PER_SITE - distance));
+    const parsedYear = /^\d{4}$/.test(yearGuess) ? Number(yearGuess) : null;
+    const locationPoints = locationPointsFor(distance);
+    const yearPoints = yearPointsFor(parsedYear, site.photoYear);
+
     setLastDistance(distance);
-    setLastPoints(points);
+    setLastLocationPoints(locationPoints);
+    setLastYearPoints(yearPoints);
+    setLastYearGuess(parsedYear);
     setDistances((prev) => [...prev, distance]);
-    setScores((prev) => [...prev, points]);
+    setScores((prev) => [...prev, locationPoints + yearPoints]);
     setSliderValue(50);
     setPhase("result");
   };
@@ -334,12 +374,13 @@ export default function App() {
       }
     }
     setGuess(null);
+    setYearGuess("");
     setSliderValue(50);
-    setClueSliderValue(100);
 
     if (roundIndex < landmarks.length - 1) {
       setRoundIndex((i) => i + 1);
       setPhase("playing");
+      window.scrollTo({ top: 0, behavior: "smooth" });
       setTimeout(() => {
         if (!mapRef.current) return;
         mapRef.current.setView(HERSHEY_CENTER, DEFAULT_ZOOM);
@@ -355,14 +396,100 @@ export default function App() {
     setScores([]);
     setDistances([]);
     setGuess(null);
+    setYearGuess("");
     setSliderValue(50);
-    setClueSliderValue(100);
     setPhase("intro");
     if (mapRef.current) {
       mapRef.current.remove();
       mapRef.current = null;
     }
   };
+
+  // The map card is shared by the guess and answer pages; only the header
+  // wording and the lock-in footer differ.
+  const mapCard = (
+    <div
+      className={`hhh-map-card rounded-[20px] overflow-hidden border-[6px] border-white shadow-[0_12px_32px_rgba(60,36,21,0.15)] bg-[#e9dfc8] ${
+        isMapExpanded ? "hhh-map-expanded" : ""
+      }`}
+    >
+      <div className="bg-[#3c2415] text-[#fff8e7] px-4 py-2.5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-[11px] font-black tracking-[0.18em]">
+          <MapPin className="w-4 h-4 text-[#d4a574]" /> HERSHEY, PA •
+          INTERACTIVE MAP
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:block text-[10px] tracking-widest text-[#d4a574] font-bold whitespace-nowrap">
+            {isMapExpanded
+              ? "DERRY TOWNSHIP • ESC TO CLOSE"
+              : phase === "playing"
+                ? "ZOOM 14 • CLICK TO GUESS"
+                : "PAN & ZOOM TO EXPLORE"}
+          </div>
+          <button
+            onClick={toggleMapExpanded}
+            aria-pressed={isMapExpanded}
+            aria-label={
+              isMapExpanded
+                ? "Shrink map back into the page"
+                : "Expand map to fill the screen"
+            }
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#d4a574] px-3 py-1 text-[10px] font-black tracking-widest text-[#3c2415] transition hover:bg-[#e6c89a]"
+          >
+            {isMapExpanded ? (
+              <>
+                <Minimize2 className="w-3.5 h-3.5" /> CLOSE
+              </>
+            ) : (
+              <>
+                <Maximize2 className="w-3.5 h-3.5" /> EXPAND
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div
+        ref={mapContainerRef}
+        className="hhh-map-canvas w-full bg-[#d8cfb3]"
+        style={{ height: "clamp(240px, 40vh, 500px)" }}
+      />
+
+      {/* Fullscreen hides the sidebar, so the guess can be locked in from here
+          rather than shrinking the map first. */}
+      {isMapExpanded && phase === "playing" && (
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t-2 border-[#d4a574] bg-[#3c2415] px-4 py-3">
+          <div className="flex items-center gap-2 text-[12px] font-bold text-[#fff8e7]">
+            {guess ? (
+              <>
+                <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-[#d4a574]" />
+                Pin at {guess.lat.toFixed(4)}, {guess.lng.toFixed(4)}
+                <span className="hidden md:inline text-[#fff8e7]/50">
+                  — click again to move it
+                </span>
+              </>
+            ) : (
+              <>
+                <Info className="h-4 w-4 shrink-0 text-[#d4a574]" />
+                Tap anywhere on the map to drop your pin
+              </>
+            )}
+          </div>
+          <button
+            onClick={lockInFromExpandedMap}
+            disabled={!guess}
+            className={`inline-flex items-center justify-center gap-2 rounded-full px-6 py-2.5 text-[13px] font-black tracking-widest transition ${
+              guess
+                ? "bg-[#d4a574] text-[#3c2415] hover:bg-[#e6c89a]"
+                : "cursor-not-allowed border border-[#fff8e7]/20 bg-[#fff8e7]/10 text-[#fff8e7]/30"
+            }`}
+          >
+            LOCK IN GUESS <MapPin className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-[#fff8e7] text-[#3c2415] selection:bg-[#d4a574]/40">
@@ -385,7 +512,7 @@ export default function App() {
                 HERSHEY HISTORY HUNT
               </h1>
               <p className="text-[11px] md:text-[12px] tracking-[0.22em] text-[#d4a574] font-bold -mt-0.5">
-                WHERE WAS THIS?
+                WHERE AND WHEN WAS THIS?
               </p>
             </div>
           </div>
@@ -410,6 +537,7 @@ export default function App() {
       </header>
 
       <main className="hhh-main relative z-10 mx-auto max-w-[1280px] px-4 md:px-6 py-6 md:py-8">
+        {/* ---------------------------------------------------------- LAUNCH */}
         {phase === "intro" && (
           <div className="hhh-intro max-w-[760px] mx-auto">
             <div className="bg-white rounded-[24px] border border-[#d4a574]/40 shadow-[0_20px_60px_rgba(60,36,21,0.12)] overflow-hidden">
@@ -418,23 +546,27 @@ export default function App() {
                 <div className="inline-flex items-center gap-2 bg-[#fff8e7] border border-[#d4a574]/40 rounded-full px-4 py-1.5 mb-5">
                   <Camera className="w-4 h-4 text-[#3c2415]" />
                   <span className="text-[11px] font-bold tracking-[0.18em]">
-                    VOLUNTEER EDITION • HERSHEY HISTORY CENTER
+                    HERSHEY HISTORY CENTER
                   </span>
                 </div>
 
-                <h2 className="hhh-intro-title text-[32px] md:text-[44px] font-black leading-[0.95] tracking-tight">
-                  Step into <span className="text-[#8b5a2b]">1910</span>,
-                  <br />
-                  find it today.
+                <h2 className="hhh-intro-title text-[32px] md:text-[44px] font-black leading-[1.02] tracking-tight">
+                  When and where is this in Hershey History?
                 </h2>
 
                 <p className="mt-5 text-[17px] md:text-[18px] leading-relaxed text-[#3c2415]/80 max-w-[58ch]">
-                  Look at the historic photo, then click on the map where you
-                  think it was taken. You'll see what it looks like today and
-                  learn the story.
+                  Test your Hershey history knowledge! Guess the date and
+                  location of{" "}
+                  <a
+                    href={ARCHIVE_URL}
+                    className="font-bold text-[#8b5a2b] underline decoration-[#d4a574] decoration-2 underline-offset-2 hover:text-[#3c2415]"
+                  >
+                    Hershey History Center's
+                  </a>{" "}
+                  archive photo to score points and unlock present-day views.
                 </p>
 
-                <div className="hhh-intro-steps mt-8 grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="hhh-intro-steps mt-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                   {INTRO_STEPS.map((step) => (
                     <div
                       key={step.n}
@@ -453,384 +585,361 @@ export default function App() {
                   ))}
                 </div>
 
-                <div className="hhh-intro-actions mt-8 flex flex-wrap gap-3">
+                <div className="hhh-intro-actions mt-8 flex flex-wrap items-center gap-4">
                   <button
                     onClick={startHunt}
                     className="inline-flex items-center gap-2 bg-[#3c2415] text-[#fff8e7] hover:bg-[#2a190e] transition rounded-full px-7 py-3.5 font-black tracking-widest text-[13px] shadow-[0_8px_20px_rgba(60,36,21,0.25)]"
                   >
                     START HUNT <ArrowRight className="w-4 h-4" />
                   </button>
-                  <div className="inline-flex items-center gap-2 text-[12px] text-[#3c2415]/60 px-2">
-                    <Info className="w-4 h-4" /> {landmarks.length} historic
-                    sites • No login needed • Works for older volunteers
+                  <div className="inline-flex items-center gap-2 text-[15px] text-[#3c2415]/70">
+                    <Info className="w-5 h-5 shrink-0" /> {landmarks.length}{" "}
+                    historic sites • No login needed
                   </div>
                 </div>
 
-                <div className="hhh-intro-sites mt-8 grid grid-cols-2 md:grid-cols-4 gap-2">
-                  {landmarks.map((landmark) => (
-                    <div
-                      key={landmark.id}
-                      className="rounded-xl border border-dashed border-[#d4a574]/50 bg-[#fff8e7]/70 px-3 py-2"
-                    >
-                      <div className="text-[10px] font-bold tracking-widest text-[#8b5a2b]">
-                        {landmark.year}
-                      </div>
-                      <div className="text-[12px] font-bold leading-tight">
-                        {landmark.shortTitle}
-                      </div>
-                    </div>
-                  ))}
+                <div className="mt-6 rounded-2xl border border-[#d4a574]/30 bg-[#fff8e7] px-5 py-4">
+                  <div className="text-[11px] font-black tracking-[0.18em] text-[#8b5a2b]">
+                    HOW SCORING WORKS
+                  </div>
+                  <p className="mt-1.5 text-[15px] leading-relaxed text-[#3c2415]/80">
+                    Each site is worth {MAX_POINTS_PER_SITE} points — up to{" "}
+                    <b>{MAX_LOCATION_POINTS} for the location</b>, losing 100
+                    for every tenth of a mile you are off, and up to{" "}
+                    <b>{MAX_YEAR_POINTS} for the year</b>, losing 1 point per
+                    year. When the archive has no date on file, the year scores
+                    full marks.
+                  </p>
                 </div>
               </div>
             </div>
             <div className="hhh-intro-attribution text-center mt-4 text-[11px] tracking-widest text-[#3c2415]/40 font-bold">
-              MADE FOR HERSHEY HISTORY CENTER • CHOCOLATE TOWN, PA
+              THE HERSHEY-DERRY TOWNSHIP HISTORICAL SOCIETY, 40 NORTHEAST DRIVE,
+              HERSHEY, PA 17033
             </div>
           </div>
         )}
 
-        {(phase === "playing" || phase === "result") && (
+        {/* ----------------------------------------------------------- GUESS */}
+        {phase === "playing" && (
           <>
             <div className="hhh-game-header flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <span className="inline-flex items-center gap-1.5 bg-[#3c2415] text-[#fff8e7] rounded-full px-3 py-1 text-[11px] font-black tracking-widest">
-                  <span className="w-5 h-5 rounded-full bg-[#d4a574] text-[#3c2415] grid place-items-center text-[11px]">
-                    {roundIndex + 1}
-                  </span>
-                  {site.year.toUpperCase()}
+              <span className="inline-flex items-center gap-1.5 bg-[#3c2415] text-[#fff8e7] rounded-full px-3 py-1 text-[11px] font-black tracking-widest">
+                <span className="w-5 h-5 rounded-full bg-[#d4a574] text-[#3c2415] grid place-items-center text-[11px]">
+                  {roundIndex + 1}
                 </span>
-                <h2 className="font-black text-[16px] md:text-[20px] tracking-tight leading-none">
-                  {site.title}
-                </h2>
-              </div>
+                SITE {roundIndex + 1} OF {landmarks.length}
+              </span>
               <div className="hidden md:flex items-center gap-2 text-[11px] font-bold tracking-widest text-[#3c2415]/60">
                 <Navigation className="w-4 h-4" /> CLICK MAP TO PLACE PIN
               </div>
             </div>
 
-            <div
-              className={
-                phase === "result"
-                  ? "hhh-game-layout hhh-result-layout grid grid-cols-1 gap-5 items-start"
-                  : "hhh-game-layout grid grid-cols-1 gap-5 items-start"
-              }
-            >
-              <div className="hhh-game-content space-y-4">
-                {phase === "playing" && (
-                  <div className="rounded-[20px] overflow-hidden border-[6px] border-white shadow-[0_12px_32px_rgba(60,36,21,0.15)] bg-[#efe0c6]">
-                    {hasPairedPhotos ? (
-                      <ThenNowSlider
-                        site={site}
-                        value={clueSliderValue}
-                        onChange={setClueSliderValue}
-                        hint="DRAG TO SEE TODAY"
-                        label="Reveal today's view of this site"
-                        className="w-full bg-gradient-to-br from-[#d4a574] via-[#b88a5a] to-[#8b5a2b]"
-                        style={{ height: "clamp(240px, 40vh, 460px)" }}
+            <div className="hhh-game-layout grid grid-cols-1 gap-5 items-start md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+              <div className="space-y-4">
+                <div className="rounded-[20px] overflow-hidden border-[6px] border-white shadow-[0_12px_32px_rgba(60,36,21,0.15)] bg-[#efe0c6]">
+                  <div
+                    className="relative w-full bg-gradient-to-br from-[#d4a574] via-[#b88a5a] to-[#8b5a2b]"
+                    style={{ height: "clamp(240px, 40vh, 460px)" }}
+                  >
+                    {site.thenImage && (
+                      <img
+                        src={site.thenImage}
+                        alt="Historic photograph of the site you are trying to place"
+                        className="absolute inset-0 h-full w-full object-cover sepia"
                       />
-                    ) : (
-                      <div
-                        className="relative w-full bg-gradient-to-br from-[#d4a574] via-[#b88a5a] to-[#8b5a2b]"
-                        style={{ height: "clamp(240px, 40vh, 460px)" }}
-                      >
-                        {site.thenImage && (
-                          <img
-                            src={site.thenImage}
-                            alt={`Historic image of ${site.historicLabel}`}
-                            className="absolute inset-0 h-full w-full object-cover sepia"
-                          />
-                        )}
-                        <div
-                          className="absolute inset-0 opacity-20 mix-blend-multiply"
-                          style={{
-                            backgroundImage:
-                              "radial-gradient(circle at 30% 20%, #fff8e7 0%, transparent 40%), radial-gradient(circle at 80% 80%, #3c2415 0%, transparent 30%)",
-                          }}
-                        />
-                        <div
-                          className="absolute inset-0 bg-[#fff8e7]/10"
-                          style={{ filter: "sepia(0.7) contrast(1.1)" }}
-                        />
-                        <div className="pointer-events-none absolute inset-0 rounded-[14px] shadow-[inset_0_0_120px_rgba(60,36,21,0.5)]" />
-                      </div>
                     )}
-
-                    <div className="bg-[#fff8e7] p-5 md:p-6 text-center">
-                      <div className="inline-block bg-[#3c2415] text-[#fff8e7] text-[10px] font-black tracking-[0.2em] px-3 py-1 rounded-full mb-3">
-                        HISTORIC PHOTO • {site.year.toUpperCase()}
-                      </div>
-                      <h3 className="font-black text-[24px] leading-tight text-[#3c2415]">
-                        {site.historicLabel}
-                      </h3>
-                      <p className="mt-2 text-[12px] font-bold tracking-widest text-[#3c2415]/70">
-                        {site.title.toUpperCase()}
-                      </p>
-                      <p className="mt-4 text-[13px] leading-relaxed text-[#3c2415]/80 italic max-w-[58ch] mx-auto">
-                        "Glass plate negative — Hershey History Center
-                        collection. Note the smokestacks and trolley line."
-                      </p>
-                      <div className="mt-4 pt-3 border-t border-[#d4a574]/30 flex justify-between text-[10px] font-bold tracking-widest text-[#3c2415]/60">
-                        <span>© HERSHEY ARCHIVES</span>
-                        <span>PLATE #{String(site.id).padStart(3, "0")}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {phase === "result" && (
-                  <div className="rounded-[20px] overflow-hidden border border-[#d4a574]/40 bg-white shadow-[0_12px_32px_rgba(60,36,21,0.12)]">
-                    <ThenNowSlider
-                      site={site}
-                      value={sliderValue}
-                      onChange={setSliderValue}
-                      className="hhh-result-image bg-gradient-to-br from-[#a8c686] via-[#d4a574] to-[#fff8e7]"
+                    <div
+                      className="absolute inset-0 opacity-20 mix-blend-multiply"
                       style={{
-                        height: "clamp(150px, calc(45vh - 200px), 280px)",
+                        backgroundImage:
+                          "radial-gradient(circle at 30% 20%, #fff8e7 0%, transparent 40%), radial-gradient(circle at 80% 80%, #3c2415 0%, transparent 30%)",
                       }}
                     />
-
-                    <div className="hhh-comparison-captions grid grid-cols-2 border-t border-[#d4a574]/30">
-                      <div className="hhh-result-caption bg-[#fff8e7] text-center flex flex-col items-center justify-center">
-                        <div className="bg-[#3c2415] text-[#fff8e7] text-[8px] font-black tracking-[0.12em] px-2 py-0.5 rounded-full mb-1.5">
-                          THEN • {site.year}
-                        </div>
-                        <div className="font-black text-[15px] leading-tight text-[#3c2415]">
-                          {site.historicLabel}
-                        </div>
-                      </div>
-                      <div className="hhh-result-caption bg-white border-l border-[#d4a574]/30 text-center flex flex-col items-center justify-center">
-                        <div className="bg-[#d4a574] text-[#3c2415] text-[8px] font-black tracking-[0.12em] px-2 py-0.5 rounded-full mb-1.5">
-                          NOW • TODAY
-                        </div>
-                        <div className="font-black text-[15px] leading-tight text-[#3c2415]">
-                          {site.modernLabel}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="hhh-result-footer bg-[#fff8e7] border-t border-[#d4a574]/30 flex items-center justify-between">
-                      <div className="text-[11px] font-bold tracking-widest text-[#3c2415]/70">
-                        THEN &amp; NOW COMPARISON
-                      </div>
-                      <div className="text-[11px] font-bold tracking-widest text-[#3c2415]/40">
-                        VOLUNTEER CONTRIBUTION ENABLED
-                      </div>
-                    </div>
+                    <div
+                      className="absolute inset-0 bg-[#fff8e7]/10"
+                      style={{ filter: "sepia(0.7) contrast(1.1)" }}
+                    />
+                    <div className="pointer-events-none absolute inset-0 rounded-[14px] shadow-[inset_0_0_120px_rgba(60,36,21,0.5)]" />
                   </div>
-                )}
 
-                {phase === "result" && (
-                  <div className="hhh-result-story bg-white rounded-[18px] border border-[#d4a574]/30 shadow-sm">
-                    <div className="hhh-result-score flex flex-wrap items-center gap-3">
-                      <div className="bg-[#3c2415] text-[#fff8e7] rounded-full px-4 py-2 font-black text-[13px] flex items-center gap-2">
-                        <Navigation className="w-4 h-4 text-[#d4a574]" />{" "}
-                        {Math.round(lastDistance)}m AWAY
-                      </div>
-                      <div className="bg-[#d4a574] text-[#3c2415] rounded-full px-4 py-2 font-black text-[13px] flex items-center gap-2">
-                        <Award className="w-4 h-4" /> +{lastPoints} POINTS
-                      </div>
-                      <div className="ml-auto text-[11px] font-bold tracking-widest text-[#3c2415]/50">
-                        {ratingFor(lastDistance)}
-                      </div>
+                  <div className="bg-[#fff8e7] p-5 md:p-6 text-center">
+                    <div className="inline-block bg-[#3c2415] text-[#fff8e7] text-[10px] font-black tracking-[0.2em] px-3 py-1 rounded-full mb-3">
+                      HINT
                     </div>
-
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <h4 className="font-black text-[15px] tracking-widest">
-                        THE STORY
-                      </h4>
-                      <button
-                        onClick={() => setIsStoryExpanded(true)}
-                        aria-label={`Read the full story of ${site.title}`}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#d4a574]/50 bg-[#fff8e7] px-3 py-1 text-[10px] font-black tracking-widest text-[#3c2415] transition hover:bg-[#f2e3c4]"
-                      >
-                        <BookOpen className="w-3.5 h-3.5" /> READ FULL STORY
-                      </button>
-                    </div>
-                    <p className="hhh-story-preview text-[15px] leading-relaxed text-[#3c2415]/80">
-                      {site.history}
+                    <p className="font-black text-[20px] md:text-[22px] leading-snug text-[#3c2415] max-w-[46ch] mx-auto">
+                      {site.hint?.trim() || "No hint for this one."}
                     </p>
-
-                    <div className="hhh-result-next flex">
-                      <button
-                        onClick={nextSite}
-                        className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-[#3c2415] text-[#fff8e7] hover:bg-[#2a190e] transition rounded-full px-7 py-3.5 font-black tracking-widest text-[13px]"
-                      >
-                        {roundIndex < landmarks.length - 1
-                          ? "NEXT SITE"
-                          : "SEE FINAL SCORE"}{" "}
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
+                    <div className="mt-4 pt-3 border-t border-[#d4a574]/30 flex justify-between text-[10px] font-bold tracking-widest text-[#3c2415]/60">
+                      <span>© HERSHEY ARCHIVES</span>
+                      <span>PLATE #{String(site.id).padStart(3, "0")}</span>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
 
-              <div className="hhh-game-sidebar lg:sticky lg:top-6 space-y-4">
-                <div
-                  className={`hhh-map-card rounded-[20px] overflow-hidden border-[6px] border-white shadow-[0_12px_32px_rgba(60,36,21,0.15)] bg-[#e9dfc8] ${
-                    isMapExpanded ? "hhh-map-expanded" : ""
-                  }`}
-                >
-                  <div className="bg-[#3c2415] text-[#fff8e7] px-4 py-2.5 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-[11px] font-black tracking-[0.18em]">
-                      <MapPin className="w-4 h-4 text-[#d4a574]" /> HERSHEY, PA •
-                      INTERACTIVE MAP
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="hidden sm:block text-[10px] tracking-widest text-[#d4a574] font-bold whitespace-nowrap">
-                        {isMapExpanded
-                          ? "DERRY TOWNSHIP • ESC TO CLOSE"
-                          : "ZOOM 14 • CLICK TO GUESS"}
-                      </div>
-                      <button
-                        onClick={toggleMapExpanded}
-                        aria-pressed={isMapExpanded}
-                        aria-label={
-                          isMapExpanded
-                            ? "Shrink map back into the page"
-                            : "Expand map to fill the screen"
-                        }
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#d4a574] px-3 py-1 text-[10px] font-black tracking-widest text-[#3c2415] transition hover:bg-[#e6c89a]"
-                      >
-                        {isMapExpanded ? (
-                          <>
-                            <Minimize2 className="w-3.5 h-3.5" /> CLOSE
-                          </>
-                        ) : (
-                          <>
-                            <Maximize2 className="w-3.5 h-3.5" /> EXPAND
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                  <div
-                    ref={mapContainerRef}
-                    className="hhh-map-canvas w-full bg-[#d8cfb3]"
-                    style={{ height: "clamp(240px, 40vh, 500px)" }}
-                  />
-
-                  {/* Fullscreen hides the sidebar, so the guess can be locked
-                      in from here rather than shrinking the map first. */}
-                  {isMapExpanded && phase === "playing" && (
-                    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t-2 border-[#d4a574] bg-[#3c2415] px-4 py-3">
-                      <div className="flex items-center gap-2 text-[12px] font-bold text-[#fff8e7]">
-                        {guess ? (
-                          <>
-                            <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-[#d4a574]" />
-                            Pin at {guess.lat.toFixed(4)}, {guess.lng.toFixed(4)}
-                            <span className="hidden md:inline text-[#fff8e7]/50">
-                              — click again to move it
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <Info className="h-4 w-4 shrink-0 text-[#d4a574]" />
-                            Tap anywhere on the map to drop your pin
-                          </>
-                        )}
-                      </div>
-                      <button
-                        onClick={lockInFromExpandedMap}
-                        disabled={!guess}
-                        className={`inline-flex items-center justify-center gap-2 rounded-full px-6 py-2.5 text-[13px] font-black tracking-widest transition ${
-                          guess
-                            ? "bg-[#d4a574] text-[#3c2415] hover:bg-[#e6c89a]"
-                            : "cursor-not-allowed border border-[#fff8e7]/20 bg-[#fff8e7]/10 text-[#fff8e7]/30"
-                        }`}
-                      >
-                        LOCK IN GUESS <MapPin className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
+              <div className="hhh-game-sidebar space-y-4">
+                {mapCard}
 
                 <div className="bg-white rounded-[16px] border border-[#d4a574]/30 p-4 shadow-sm">
-                  {phase === "playing" ? (
-                    <>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="text-[11px] font-black tracking-[0.18em] text-[#3c2415]/60">
-                          YOUR GUESS
-                        </div>
-                        <div className="text-[11px] font-bold text-[#8b5a2b]">
-                          {guess
-                            ? `${guess.lat.toFixed(4)}, ${guess.lng.toFixed(4)}`
-                            : "No pin placed yet"}
-                        </div>
-                      </div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-[11px] font-black tracking-[0.18em] text-[#3c2415]/60">
+                      YOUR GUESS
+                    </div>
+                    <div className="text-[11px] font-bold text-[#8b5a2b]">
+                      {guess
+                        ? `${guess.lat.toFixed(4)}, ${guess.lng.toFixed(4)}`
+                        : "No pin placed yet"}
+                    </div>
+                  </div>
 
-                      {guess ? (
-                        <div className="flex items-center gap-2 text-[12px] bg-[#fff8e7] border border-[#d4a574]/30 rounded-full px-3 py-2 mb-3">
-                          <span className="w-2 h-2 rounded-full bg-[#3c2415]" />{" "}
-                          Pin placed — you can click again to move it
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-[12px] bg-[#fff8e7]/70 border border-dashed border-[#d4a574]/50 rounded-full px-3 py-2 mb-3 text-[#3c2415]/60">
-                          <Info className="w-4 h-4" /> Tap anywhere on the map to
-                          drop your chocolate pin
-                        </div>
-                      )}
-
-                      <button
-                        onClick={lockInGuess}
-                        disabled={!guess}
-                        className={`w-full rounded-full py-3.5 font-black tracking-widest text-[13px] transition flex items-center justify-center gap-2 ${
-                          guess
-                            ? "bg-[#3c2415] text-[#fff8e7] hover:bg-[#2a190e] shadow-[0_8px_18px_rgba(60,36,21,0.25)]"
-                            : "bg-[#efe0c6] text-[#3c2415]/30 cursor-not-allowed border border-[#d4a574]/20"
-                        }`}
-                      >
-                        LOCK IN GUESS <MapPin className="w-4 h-4" />
-                      </button>
-
-                      <div className="mt-3 flex items-center gap-2 text-[10px] font-bold tracking-widest text-[#3c2415]/40 justify-center">
-                        <span className="inline-flex items-center gap-1">
-                          <span className="w-3 h-3 rounded-full bg-[#3c2415] border-2 border-[#fff8e7] inline-block" />{" "}
-                          Your Guess
-                        </span>
-                        <span className="opacity-40">•</span>
-                        <span className="inline-flex items-center gap-1">
-                          <span className="w-3 h-3 rounded-full bg-[#d4a574] border-2 border-[#3c2415] inline-block" />{" "}
-                          Actual Site
-                        </span>
-                      </div>
-                    </>
+                  {guess ? (
+                    <div className="flex items-center gap-2 text-[12px] bg-[#fff8e7] border border-[#d4a574]/30 rounded-full px-3 py-2 mb-3">
+                      <span className="w-2 h-2 rounded-full bg-[#3c2415]" /> Pin
+                      placed — you can click again to move it
+                    </div>
                   ) : (
-                    <>
-                      <div className="text-[11px] font-black tracking-[0.18em] text-[#3c2415]/60 mb-2">
-                        RESULT REVEAL
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 mb-3">
-                        <div className="bg-[#fff8e7] rounded-xl border border-[#d4a574]/30 p-3">
-                          <div className="text-[10px] font-bold tracking-widest text-[#3c2415]/50">
-                            YOUR PIN
-                          </div>
-                          <div className="font-mono text-[11px] font-bold mt-1">
-                            {guess?.lat.toFixed(5)}, {guess?.lng.toFixed(5)}
-                          </div>
-                        </div>
-                        <div className="bg-[#3c2415] text-[#fff8e7] rounded-xl p-3">
-                          <div className="text-[10px] font-bold tracking-widest text-[#d4a574]">
-                            ACTUAL
-                          </div>
-                          <div className="font-mono text-[11px] font-bold mt-1">
-                            {site.lat.toFixed(5)}, {site.lng.toFixed(5)}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="h-[2px] w-full bg-gradient-to-r from-[#3c2415] via-[#d4a574] to-[#3c2415] rounded-full mb-3" />
-                      <div className="text-[12px] leading-snug text-[#3c2415]/70">
-                        Gold star = true location. Dashed line = your error. Pan
-                        &amp; zoom to explore Hershey around the site.
-                      </div>
-                    </>
+                    <div className="flex items-center gap-2 text-[12px] bg-[#fff8e7]/70 border border-dashed border-[#d4a574]/50 rounded-full px-3 py-2 mb-3 text-[#3c2415]/60">
+                      <Info className="w-4 h-4" /> Tap anywhere on the map to
+                      drop your chocolate pin
+                    </div>
                   )}
+
+                  <label
+                    htmlFor="year-guess"
+                    className="flex items-center gap-2 text-[11px] font-black tracking-[0.18em] text-[#3c2415]/60 mb-2"
+                  >
+                    <Calendar className="w-4 h-4" /> WHAT YEAR WAS IT TAKEN?
+                  </label>
+                  <input
+                    id="year-guess"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={4}
+                    placeholder="YYYY"
+                    value={yearGuess}
+                    onChange={(event) =>
+                      setYearGuess(
+                        event.target.value.replace(/\D/g, "").slice(0, 4),
+                      )
+                    }
+                    className="mb-3 w-full rounded-2xl border-2 border-[#d4a574]/50 bg-[#fff8e7] px-4 py-3 text-center text-[24px] font-black tracking-[0.18em] text-[#3c2415] placeholder:text-[#3c2415]/25 focus:border-[#3c2415] focus:outline-none"
+                  />
+
+                  <button
+                    onClick={lockInGuess}
+                    disabled={!guess}
+                    className={`w-full rounded-full py-3.5 font-black tracking-widest text-[13px] transition flex items-center justify-center gap-2 ${
+                      guess
+                        ? "bg-[#3c2415] text-[#fff8e7] hover:bg-[#2a190e] shadow-[0_8px_18px_rgba(60,36,21,0.25)]"
+                        : "bg-[#efe0c6] text-[#3c2415]/30 cursor-not-allowed border border-[#d4a574]/20"
+                    }`}
+                  >
+                    LOCK IN GUESS <MapPin className="w-4 h-4" />
+                  </button>
+
+                  <div className="mt-3 flex items-center gap-2 text-[10px] font-bold tracking-widest text-[#3c2415]/40 justify-center">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-3 h-3 rounded-full bg-[#3c2415] border-2 border-[#fff8e7] inline-block" />{" "}
+                      Your Guess
+                    </span>
+                    <span className="opacity-40">•</span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-3 h-3 rounded-full bg-[#d4a574] border-2 border-[#3c2415] inline-block" />{" "}
+                      Actual Site
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
           </>
         )}
 
+        {/* ---------------------------------------------------------- ANSWER */}
+        {phase === "result" && (
+          <div className="hhh-answer mx-auto max-w-[900px] space-y-5">
+            <div className="rounded-[20px] border border-[#d4a574]/40 bg-white p-5 md:p-6 shadow-[0_12px_32px_rgba(60,36,21,0.12)]">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="text-[11px] font-black tracking-[0.2em] text-[#8b5a2b]">
+                  SITE {roundIndex + 1} OF {landmarks.length} •{" "}
+                  {displayYear.toUpperCase()}
+                </span>
+              </div>
+              <h2 className="mt-1 font-black text-[26px] md:text-[34px] leading-tight tracking-tight">
+                {site.title}
+              </h2>
+
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="rounded-2xl bg-[#fff8e7] border border-[#d4a574]/30 p-3">
+                  <div className="text-[10px] font-black tracking-widest text-[#3c2415]/50">
+                    LOCATION
+                  </div>
+                  <div className="mt-1 font-black text-[20px] leading-none">
+                    {milesOff.toFixed(1)} mi off
+                  </div>
+                  <div className="mt-1 text-[13px] font-bold text-[#8b5a2b]">
+                    +{lastLocationPoints} of {MAX_LOCATION_POINTS}
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-[#fff8e7] border border-[#d4a574]/30 p-3">
+                  <div className="text-[10px] font-black tracking-widest text-[#3c2415]/50">
+                    YEAR
+                  </div>
+                  <div className="mt-1 font-black text-[20px] leading-none">
+                    {site.photoYear == null
+                      ? "No date on file"
+                      : lastYearGuess == null
+                        ? "No year entered"
+                        : `${Math.abs(lastYearGuess - site.photoYear)} yr off`}
+                  </div>
+                  <div className="mt-1 text-[13px] font-bold text-[#8b5a2b]">
+                    +{lastYearPoints} of {MAX_YEAR_POINTS}
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-[#3c2415] text-[#fff8e7] p-3">
+                  <div className="text-[10px] font-black tracking-widest text-[#d4a574]">
+                    THIS SITE
+                  </div>
+                  <div className="mt-1 font-black text-[26px] leading-none">
+                    {lastTotal}
+                  </div>
+                  <div className="mt-1 text-[13px] font-bold text-[#d4a574]">
+                    {ratingFor(lastDistance)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 1 — Then & Now */}
+            <section className="rounded-[20px] overflow-hidden border border-[#d4a574]/40 bg-white shadow-[0_12px_32px_rgba(60,36,21,0.12)]">
+              <h3 className="flex items-center gap-2 bg-[#fff8e7] border-b border-[#d4a574]/30 px-5 py-3 text-[11px] font-black tracking-[0.18em] text-[#3c2415]/70">
+                <Camera className="w-4 h-4" /> THEN &amp; NOW
+              </h3>
+              <ThenNowSlider
+                site={site}
+                value={sliderValue}
+                onChange={setSliderValue}
+                className="bg-gradient-to-br from-[#a8c686] via-[#d4a574] to-[#fff8e7]"
+                style={{ height: "clamp(220px, 46vh, 460px)" }}
+              />
+              <div className="grid grid-cols-2 border-t border-[#d4a574]/30">
+                <div className="hhh-result-caption bg-[#fff8e7] text-center flex flex-col items-center justify-center">
+                  <div className="bg-[#3c2415] text-[#fff8e7] text-[9px] font-black tracking-[0.12em] px-2 py-0.5 rounded-full mb-1.5">
+                    THEN • {displayYear}
+                  </div>
+                  <div className="font-black text-[15px] leading-tight text-[#3c2415]">
+                    {site.historicLabel}
+                  </div>
+                </div>
+                <div className="hhh-result-caption bg-white border-l border-[#d4a574]/30 text-center flex flex-col items-center justify-center">
+                  <div className="bg-[#d4a574] text-[#3c2415] text-[9px] font-black tracking-[0.12em] px-2 py-0.5 rounded-full mb-1.5">
+                    NOW • {site.nowYear ?? "TODAY"}
+                  </div>
+                  <div className="font-black text-[15px] leading-tight text-[#3c2415]">
+                    {site.modernLabel}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Section 2 — Map and location answer */}
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+              {mapCard}
+              <div className="bg-white rounded-[16px] border border-[#d4a574]/30 p-4 shadow-sm">
+                <div className="text-[11px] font-black tracking-[0.18em] text-[#3c2415]/60 mb-2">
+                  RESULT REVEAL
+                </div>
+                <div className="mb-3 rounded-2xl bg-[#fff8e7] border border-[#d4a574]/30 px-4 py-3 text-center">
+                  <div className="font-black text-[28px] leading-none">
+                    {milesOff.toFixed(1)} mi
+                  </div>
+                  <div className="mt-1 text-[11px] font-bold tracking-widest text-[#3c2415]/60">
+                    FROM THE TRUE LOCATION
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div className="bg-[#fff8e7] rounded-xl border border-[#d4a574]/30 p-3">
+                    <div className="text-[10px] font-bold tracking-widest text-[#3c2415]/50">
+                      YOUR PIN
+                    </div>
+                    <div className="font-mono text-[11px] font-bold mt-1">
+                      {guess?.lat.toFixed(5)}, {guess?.lng.toFixed(5)}
+                    </div>
+                  </div>
+                  <div className="bg-[#3c2415] text-[#fff8e7] rounded-xl p-3">
+                    <div className="text-[10px] font-bold tracking-widest text-[#d4a574]">
+                      ACTUAL
+                    </div>
+                    <div className="font-mono text-[11px] font-bold mt-1">
+                      {site.lat.toFixed(5)}, {site.lng.toFixed(5)}
+                    </div>
+                  </div>
+                </div>
+                <div className="h-[2px] w-full bg-gradient-to-r from-[#3c2415] via-[#d4a574] to-[#3c2415] rounded-full mb-3" />
+                <div className="text-[12px] leading-snug text-[#3c2415]/70">
+                  Gold star = true location. Dashed line = your error.
+                </div>
+              </div>
+            </section>
+
+            {/* Section 3 — More historical images */}
+            {archiveLinks.length > 0 && (
+              <section className="rounded-[20px] border border-[#d4a574]/40 bg-white shadow-sm overflow-hidden">
+                <h3 className="flex items-center gap-2 bg-[#fff8e7] border-b border-[#d4a574]/30 px-5 py-3 text-[11px] font-black tracking-[0.18em] text-[#3c2415]/70">
+                  <Images className="w-4 h-4" /> MORE HISTORICAL IMAGES
+                </h3>
+                <div className="p-5 flex flex-col gap-2">
+                  {archiveLinks.map((link) => (
+                    <a
+                      key={link.url}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-between gap-3 rounded-2xl border border-[#d4a574]/40 bg-[#fff8e7] px-4 py-3 text-[15px] font-bold text-[#3c2415] transition hover:bg-[#f2e3c4]"
+                    >
+                      {link.label}
+                      <ArrowRight className="w-4 h-4 shrink-0 text-[#8b5a2b]" />
+                    </a>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Section 4 — Historical Insight */}
+            <section className="rounded-[20px] border border-[#d4a574]/40 bg-white shadow-sm overflow-hidden">
+              <h3 className="flex items-center justify-between gap-3 bg-[#fff8e7] border-b border-[#d4a574]/30 px-5 py-3 text-[11px] font-black tracking-[0.18em] text-[#3c2415]/70">
+                <span className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4" /> HISTORICAL INSIGHT
+                </span>
+                {site.fullHistory && (
+                  <button
+                    onClick={() => setIsStoryExpanded(true)}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#d4a574]/50 bg-white px-3 py-1 text-[10px] font-black tracking-widest text-[#3c2415] transition hover:bg-[#f2e3c4]"
+                  >
+                    READ FULL STORY
+                  </button>
+                )}
+              </h3>
+              <p className="p-5 text-[16px] leading-relaxed text-[#3c2415]/85">
+                {historyText}
+              </p>
+            </section>
+
+            <div className="flex justify-center pt-1 pb-2">
+              <button
+                onClick={nextSite}
+                className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-[#3c2415] text-[#fff8e7] hover:bg-[#2a190e] transition rounded-full px-9 py-4 font-black tracking-widest text-[14px]"
+              >
+                {roundIndex < landmarks.length - 1
+                  ? "NEXT SITE"
+                  : "SEE FINAL SCORE"}{" "}
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* -------------------------------------------------------- FINISHED */}
         {phase === "finished" && (
           <div className="hhh-finished max-w-[720px] mx-auto">
             <div className="bg-white rounded-[24px] border border-[#d4a574]/40 shadow-[0_20px_60px_rgba(60,36,21,0.14)] overflow-hidden">
@@ -861,14 +970,15 @@ export default function App() {
                         className="bg-white rounded-xl border border-[#d4a574]/30 p-3"
                       >
                         <div className="text-[10px] font-bold tracking-widest text-[#8b5a2b]">
-                          {landmark.year} • SITE {i + 1}
+                          {landmark.photoYear ?? "Date unknown"} • SITE {i + 1}
                         </div>
                         <div className="text-[12px] font-bold leading-tight mt-1 line-clamp-2">
                           {landmark.shortTitle}
                         </div>
                         <div className="mt-2 flex items-center justify-between">
                           <span className="text-[11px] font-mono font-bold bg-[#3c2415] text-[#fff8e7] rounded-full px-2 py-0.5">
-                            {Math.round(distances[i] || 0)}m
+                            {(tenthsOfAMile(distances[i] || 0) / 10).toFixed(1)}{" "}
+                            mi
                           </span>
                           <span className="text-[11px] font-black text-[#8b5a2b]">
                             +{scores[i] || 0}
@@ -883,17 +993,13 @@ export default function App() {
                   {summaryFor(totalScore)}
                 </div>
 
-                <div className="hhh-finished-actions mt-7 flex flex-col md:flex-row gap-3 justify-center">
+                <div className="hhh-finished-actions mt-7 flex justify-center">
                   <button
                     onClick={restart}
                     className="inline-flex items-center justify-center gap-2 bg-[#3c2415] text-[#fff8e7] rounded-full px-7 py-3.5 font-black tracking-widest text-[13px] hover:bg-[#2a190e] transition"
                   >
                     <RotateCcw className="w-4 h-4" /> PLAY AGAIN
                   </button>
-                  <div className="inline-flex items-center justify-center gap-2 bg-[#fff8e7] border border-[#d4a574]/40 rounded-full px-5 py-3 text-[11px] font-bold tracking-widest text-[#3c2415]/60">
-                    <Camera className="w-4 h-4" /> ASK VOLUNTEERS TO ADD TODAY
-                    PHOTOS NEXT
-                  </div>
                 </div>
               </div>
             </div>
@@ -918,7 +1024,7 @@ export default function App() {
             <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#d4a574]/30 px-6 py-4 md:px-9 md:py-5">
               <div>
                 <div className="text-[11px] font-black tracking-[0.2em] text-[#8b5a2b]">
-                  {site.year.toUpperCase()} • THE STORY
+                  {displayYear.toUpperCase()} • THE STORY
                 </div>
                 <h3 className="mt-1 text-[22px] md:text-[28px] font-black leading-tight tracking-tight">
                   {site.title}
