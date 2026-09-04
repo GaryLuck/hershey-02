@@ -36,10 +36,10 @@ Keep them here so they are not lost:
 
 ## Still needed
 
-- **Descriptive text for the Hotel Hershey.** Its entry in `landmarks.json`
-  currently reads `TEXT NEEDED`. The two photos were previously mislabelled as
-  High Point Mansion; the old mansion description was removed because it
-  described a different building.
+- **Descriptive text for the Hotel Hershey.** Its `history` is empty, so the
+  Historical Insight section shows "No history provided." The two photos were
+  previously mislabelled as High Point Mansion; the old mansion description was
+  removed because it described a different building.
 - **Photo dates.** Every site has `"photoYear": null`, so the year always scores
   full marks and the game cannot demonstrate year scoring. **One real date on any
   one site is enough to show the feature working.**
