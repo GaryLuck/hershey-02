@@ -1,0 +1,6 @@
+ "archiveLinks": [
+     {
+       "label": "Search the Historical Society archive",
+       "url": "https://hersheyhistory.pastperfectonline.com/bysearchterm?keyword=Hotel%20Hershey"
+     }
+   ]

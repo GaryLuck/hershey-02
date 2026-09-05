@@ -13,7 +13,12 @@
     "modernLabel": "The Hotel Hershey",
     "thenImage": "images/hotel-hershey-then.jpg",
     "nowImage": "images/hotel-hershey-now.jpg",
-    "archiveLinks": []
+    "archiveLinks": [
+      {
+        "label": "Search the Historical Society archive",
+        "url": "https://hersheyhistory.pastperfectonline.com/bysearchterm?keyword=Hotel%20Hershey"
+      }
+    ]
   },
   {
     "id": 2,

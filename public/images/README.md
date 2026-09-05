@@ -45,9 +45,9 @@ Keep them here so they are not lost:
   one site is enough to show the feature working.**
 - **`nowYear`** — the year each present-day photo was taken. Null everywhere, so
   the slider badge reads "NOW • TODAY" instead of a year.
-- **A hint and a PastPerfect link for the Hotel Hershey.** The other three sites
-  have both; the Hotel has neither, so it shows "No hint for this one." and its
-  More Historical Images section is hidden.
+- **A hint for the Hotel Hershey.** The other three sites have one; the Hotel
+  shows "No hint for this one." Its PastPerfect link was supplied on 2026-09-05,
+  so its More Historical Images section now appears.
 - **A present-day photo of the Hocker House.**
 
 ## A note on the present-day photos
