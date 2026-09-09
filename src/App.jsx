@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import L from "leaflet";
 import ThenNowSlider from "./ThenNowSlider.jsx";
 import { assetUrl } from "./assetUrl.js";
@@ -270,6 +270,14 @@ export default function App() {
     setIsStoryExpanded(false);
   }, [phase, roundIndex]);
 
+  // Start every screen at the top. React swaps the content without touching the
+  // window's scroll position, so on a phone — where the buttons sit far down a
+  // long page — the next screen opened halfway down, showing the map instead of
+  // the photograph. useLayoutEffect so this lands before the browser paints.
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, [phase, roundIndex]);
+
   // Escape closes whichever overlay is open.
   useEffect(() => {
     if (!isMapExpanded && !isStoryExpanded) return;
@@ -381,7 +389,6 @@ export default function App() {
     if (roundIndex < landmarks.length - 1) {
       setRoundIndex((i) => i + 1);
       setPhase("playing");
-      window.scrollTo({ top: 0, behavior: "smooth" });
       setTimeout(() => {
         if (!mapRef.current) return;
         mapRef.current.setView(HERSHEY_CENTER, DEFAULT_ZOOM);
