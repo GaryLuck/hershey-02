@@ -1,3 +1,6 @@
 node_modules/
 dist/
 .vite/
+
+# scratch copy of landmarks.json for non-technical review (tools/landmarks_to_text.py)
+landmarks-review.txt
