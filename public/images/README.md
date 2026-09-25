@@ -49,6 +49,11 @@ Keep them here so they are not lost:
   shows "No hint for this one." Its PastPerfect link was supplied on 2026-09-05,
   so its More Historical Images section now appears.
 - **A present-day photo of the Hocker House.**
+- **A larger present-day photo of the Hotel Hershey.** The aerial supplied on
+  2026-09-25 is only 320x241, so a laptop stretches it about 3x and it looks soft.
+  Its historic partner is 640x497 (trimmed of its scan margin to 597x482). The
+  pair is otherwise ideal: both aerials from the same direction, so the slider
+  lines up.
 
 ## A note on the present-day photos
 
