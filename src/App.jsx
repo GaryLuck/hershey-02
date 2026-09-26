@@ -104,6 +104,18 @@ function summaryFor(totalScore) {
 
 const ARCHIVE_URL = "https://hersheyhistory.pastperfectonline.com/";
 
+/**
+ * Split authored text into display lines. The text is written in a plain-text
+ * form (tools/landmarks_to_text.py) where each hint or paragraph is one long
+ * line, so any line break — single or double — starts a new one.
+ */
+function toLines(text) {
+  return (text || "")
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 const INTRO_STEPS = [
   { n: "1", t: "Study the Photo", d: "Note buildings, hills, and year." },
   { n: "2", t: "Drop Your Pin", d: "Click the map to place your guess." },
@@ -322,11 +334,17 @@ export default function App() {
   const displayYear =
     site.photoYear == null ? "Date unknown" : String(site.photoYear);
   const archiveLinks = site.archiveLinks || [];
-  const historyText = site.history?.trim() || "No history provided.";
-  const storyParagraphs = (site.fullHistory || historyText)
-    .split(/\n\s*\n/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean);
+  const hints = toLines(site.hint);
+  const historyParagraphs = toLines(site.history);
+  const fullParagraphs = toLines(site.fullHistory);
+  const storyParagraphs = fullParagraphs.length
+    ? fullParagraphs
+    : historyParagraphs;
+  // Only offer "Read full story" when it says more than the section already
+  // shows; several sites carry a full history identical to the short one.
+  const hasFullerStory =
+    fullParagraphs.length > 0 &&
+    fullParagraphs.join(" ") !== historyParagraphs.join(" ");
 
   const milesOff = tenthsOfAMile(lastDistance) / 10;
   const lastTotal = lastLocationPoints + lastYearPoints;
@@ -673,11 +691,25 @@ export default function App() {
 
                   <div className="bg-[#fff8e7] p-5 md:p-6 text-center">
                     <div className="inline-block bg-[#3c2415] text-[#fff8e7] text-[10px] font-black tracking-[0.2em] px-3 py-1 rounded-full mb-3">
-                      HINT
+                      {hints.length > 1 ? "HINTS" : "HINT"}
                     </div>
-                    <p className="font-black text-[20px] md:text-[22px] leading-snug text-[#3c2415] max-w-[46ch] mx-auto">
-                      {site.hint?.trim() || "No hint for this one."}
-                    </p>
+                    {hints.length > 1 ? (
+                      <ul className="hhh-hints mx-auto max-w-[52ch] space-y-2.5 text-left">
+                        {hints.map((hint, i) => (
+                          <li
+                            key={i}
+                            className="flex gap-3 text-[16px] md:text-[17px] font-bold leading-snug text-[#3c2415]"
+                          >
+                            <span className="mt-[0.45em] h-2 w-2 shrink-0 rounded-full bg-[#d4a574]" />
+                            <span>{hint}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="font-black text-[20px] md:text-[22px] leading-snug text-[#3c2415] max-w-[46ch] mx-auto">
+                        {hints[0] || "No hint for this one."}
+                      </p>
+                    )}
                     <div className="mt-4 pt-3 border-t border-[#d4a574]/30 flex justify-between text-[10px] font-bold tracking-widest text-[#3c2415]/60">
                       <span>© HERSHEY ARCHIVES</span>
                       <span>PLATE #{String(site.id).padStart(3, "0")}</span>
@@ -919,7 +951,7 @@ export default function App() {
                 <span className="flex items-center gap-2">
                   <BookOpen className="w-4 h-4" /> HISTORICAL INSIGHT
                 </span>
-                {site.fullHistory && (
+                {hasFullerStory && (
                   <button
                     onClick={() => setIsStoryExpanded(true)}
                     className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#d4a574]/50 bg-white px-3 py-1 text-[10px] font-black tracking-widest text-[#3c2415] transition hover:bg-[#f2e3c4]"
@@ -928,9 +960,13 @@ export default function App() {
                   </button>
                 )}
               </h3>
-              <p className="p-5 text-[16px] leading-relaxed text-[#3c2415]/85">
-                {historyText}
-              </p>
+              <div className="p-5 space-y-3 text-[16px] leading-relaxed text-[#3c2415]/85">
+                {historyParagraphs.length ? (
+                  historyParagraphs.map((paragraph, i) => <p key={i}>{paragraph}</p>)
+                ) : (
+                  <p>No history provided.</p>
+                )}
+              </div>
             </section>
 
             <div className="flex justify-center pt-1 pb-2">

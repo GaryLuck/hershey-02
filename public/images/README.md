@@ -36,18 +36,11 @@ Keep them here so they are not lost:
 
 ## Still needed
 
-- **Descriptive text for the Hotel Hershey.** Its `history` is empty, so the
-  Historical Insight section shows "No history provided." The two photos were
-  previously mislabelled as High Point Mansion; the old mansion description was
-  removed because it described a different building.
 - **Photo dates.** Every site has `"photoYear": null`, so the year always scores
   full marks and the game cannot demonstrate year scoring. **One real date on any
   one site is enough to show the feature working.**
 - **`nowYear`** — the year each present-day photo was taken. Null everywhere, so
   the slider badge reads "NOW • TODAY" instead of a year.
-- **A hint for the Hotel Hershey.** The other three sites have one; the Hotel
-  shows "No hint for this one." Its PastPerfect link was supplied on 2026-09-05,
-  so its More Historical Images section now appears.
 - **A present-day photo of the Hocker House.**
 - **A larger present-day photo of the Hotel Hershey.** The aerial supplied on
   2026-09-25 is only 320x241, so a laptop stretches it about 3x and it looks soft.

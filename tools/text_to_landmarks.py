@@ -29,7 +29,6 @@ SINGLE = {
     "SHORT TITLE": "shortTitle",
     "PHOTO YEAR": "photoYear",
     "NOW PHOTO YEAR": "nowYear",
-    "HINT": "hint",
     "HISTORIC LABEL": "historicLabel",
     "MODERN LABEL": "modernLabel",
     "LATITUDE": "lat",
@@ -39,15 +38,29 @@ SINGLE = {
     "ARCHIVE LINK LABEL": "_linkLabel",
     "ARCHIVE LINK URL": "_linkUrl",
 }
-MULTI = {"HISTORY": "history", "FULL HISTORY": "fullHistory"}
+# A site can have several hints, one per line, so HINT reads like the history
+# fields and runs until the next label.
+MULTI = {"HINT": "hint", "HISTORY": "history", "FULL HISTORY": "fullHistory"}
 INTEGER = {"photoYear", "nowYear"}
 FLOAT = {"lat", "lng"}
 
+NOTES = []
 
-def clean(text):
-    """Normalise a multi-paragraph field: trim, collapse runs of blank lines."""
-    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text.strip())]
-    return "\n\n".join(p for p in paragraphs if p)
+
+def clean(text, where=""):
+    """Normalise a multi-paragraph field: trim, collapse runs of blank lines,
+    and drop a paragraph that exactly repeats an earlier one in the same field
+    (reported, not silent). Single line breaks inside a paragraph are kept."""
+    seen, out = set(), []
+    for p in (p.strip() for p in re.split(r"\n\s*\n", text.strip())):
+        if not p:
+            continue
+        if p in seen:
+            NOTES.append(f"{where}: dropped a repeated paragraph: {p[:60]!r}")
+            continue
+        seen.add(p)
+        out.append(p)
+    return "\n\n".join(out)
 
 
 def parse_block(lines, where):
@@ -60,7 +73,7 @@ def parse_block(lines, where):
     def flush_multi():
         nonlocal current_multi, buffer
         if current_multi:
-            site[current_multi] = clean("\n".join(buffer))
+            site[current_multi] = clean("\n".join(buffer), f"{where} {current_multi}")
         current_multi, buffer = None, []
 
     for raw in lines:
@@ -103,6 +116,7 @@ def parse_block(lines, where):
     ]
 
     # Blank means "unknown"; numbers become numbers.
+    name = site.get("shortTitle") or site.get("title") or where
     for field in list(site):
         value = site[field]
         if isinstance(value, str) and value.strip() == "":
@@ -111,12 +125,12 @@ def parse_block(lines, where):
             try:
                 site[field] = int(str(site[field]).strip())
             except ValueError:
-                raise SystemExit(f"{where}: {field} must be a whole year, got {value!r}")
+                raise SystemExit(f"{name}: {field} must be a whole year, got {value!r}")
         if field in FLOAT and site[field] is not None:
             try:
                 site[field] = float(str(site[field]).strip())
             except ValueError:
-                raise SystemExit(f"{where}: {field} must be a number, got {value!r}")
+                raise SystemExit(f"{name}: {field} must be a number, got {value!r}")
     return site
 
 
@@ -168,7 +182,10 @@ def main():
 
     live, skipped = [], []
     for n, blk in enumerate(blocks, 1):
-        site = parse_block(blk, f"site {n}")
+        notes_before = len(NOTES)
+        site = parse_block(blk, "")
+        label = site.get("shortTitle") or site.get("title") or f"block {n}"
+        NOTES[notes_before:] = [f"{label}{note}" for note in NOTES[notes_before:]]
         if not any(k for k in site if k != "archiveLinks") and not site["archiveLinks"]:
             continue  # just a "SITE n" banner between two rules
         name = site.get("title") or site.get("shortTitle") or f"site {n}"
@@ -181,12 +198,19 @@ def main():
     for s in live:
         flags = []
         if s["photoYear"] is None: flags.append("no photo year")
-        if not s["hint"]: flags.append("no hint")
+        if not s["hint"]:
+            flags.append("no hint")
+        else:
+            n = len([h for h in s["hint"].split("\n") if h.strip()])
+            flags.append(f"{n} hint{'' if n == 1 else 's'}")
         if not s["history"]: flags.append("no history")
         if "nowImage" not in s: flags.append("no now photo")
         print(f"  in game : {s['shortTitle']:<18} {', '.join(flags) or 'complete'}")
     for name in skipped:
         print(f"  left out: {name:<18} no coordinates")
+
+    for note in NOTES:
+        print(f"  note    : {note}")
 
     if check_only:
         print("(--check: nothing written)")

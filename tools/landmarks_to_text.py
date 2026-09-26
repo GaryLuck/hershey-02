@@ -30,7 +30,11 @@ STAGED = [
         "historicLabel": "The Round Barn",
         "modernLabel": "The Site",
         "thenImage": "images/round-barn-then.jpg",
-        "hint": "The area behind the barn is now all parking lots.",
+        "hint": (
+            "The area behind the barn is now all parking lots.\n\n"
+            "The many-windowed building was once cold, then held old things, "
+            "now is empty."
+        ),
         "history": (
             "Hershey’s famous Round Barn is something the older folks of "
             "Hershey still talk about, but it has been gone for well over 50 "
@@ -50,11 +54,7 @@ STAGED = [
             "been gone for years too.\n\n"
             "There were Milton Hershey School student homes here too. There is "
             "one in this image but it was replaced by a large brick one that "
-            "stood into the early 2000s.\n\n"
-            "Hints:\n\n"
-            "The area behind the barn is now all parking lots.\n\n"
-            "The many-windowed building was once cold, then held old things, "
-            "now is empty."
+            "stood into the early 2000s."
         ),
         "archiveLinks": [
             {
@@ -87,8 +87,8 @@ HOW TO USE THIS FILE
   * Each site is a block between the {RULE[:8]}... lines. One block per site.
   * Every line is a LABEL, a colon, and the value. Type your answer after
     the colon. Where it is blank, we don't have that information yet.
-  * HISTORY and FULL HISTORY can run to several paragraphs. Put a blank
-    line between paragraphs. They continue until the next LABEL.
+  * HINT, HISTORY and FULL HISTORY can run to several lines. Put each hint
+    or paragraph on its own line. They continue until the next LABEL.
   * Please leave the LABELS themselves alone. Change the LATITUDE,
     LONGITUDE and photo file lines only if you mean to.
   * Save as plain text (.txt) when you are done.
@@ -101,8 +101,9 @@ WHAT EACH LABEL MEANS
                       scored against this. Leave blank if unknown - they
                       then get full marks for the year.
   NOW PHOTO YEAR      Year the present-day photo was taken.
-  HINT                One line shown to players BEFORE they guess.
-                      Do not give away the name of the place.
+  HINT                Shown to players BEFORE they guess. One hint per
+                      line; add as many as you like. Do not give away the
+                      name of the place.
   HISTORIC LABEL      Caption under the old photo on the answer page.
   MODERN LABEL        Caption under the present-day photo.
   LATITUDE/LONGITUDE  Where the site is. A site with these blank stays out
