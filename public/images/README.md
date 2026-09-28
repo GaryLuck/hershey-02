@@ -12,6 +12,10 @@ back to a decorative gradient.
 | Site | then | now |
 |---|---|---|
 | Hotel Hershey | `hotel-hershey-then.jpg` | `hotel-hershey-now.jpg` |
+
+The Hotel Hershey pair is **registered**: the historic photo is cropped to exactly
+the area the present-day aerial covers, so the two line up in the slider at any
+screen size. Replacing either photo means redoing that crop.
 | 743 & Cocoa | `cocoa-743-then.jpg` | `cocoa-743-now.jpg` |
 | State Police Academy | `police-academy-then.jpg` | `police-academy-now.jpg` |
 | Hocker House | `hocker-house-then.jpg` | *missing* |
