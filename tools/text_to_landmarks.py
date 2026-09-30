@@ -40,7 +40,13 @@ SINGLE = {
 }
 # A site can have several hints, one per line, so HINT reads like the history
 # fields and runs until the next label.
-MULTI = {"HINT": "hint", "HISTORY": "history", "FULL HISTORY": "fullHistory"}
+MULTI = {
+    "HINT": "hint",
+    "HISTORY": "history",
+    "FULL HISTORY": "fullHistory",
+    # The link tends to go on the line after the label, so read it like text.
+    "GOOGLE MAP": "googleMapUrl",
+}
 INTEGER = {"photoYear", "nowYear"}
 FLOAT = {"lat", "lng"}
 
@@ -70,16 +76,38 @@ def parse_block(lines, where):
     current_multi = None
     buffer = []
 
+    def name():
+        return site.get("shortTitle") or site.get("title") or "a site"
+
+    def put(field, value, label):
+        """Store a value. The same label can appear twice when someone types a
+        new value lower down instead of filling in the original blank line, so
+        a blank never wipes out a filled value, and two different filled
+        values stop the conversion rather than silently picking one."""
+        prior = site.get(field)
+        if not value and prior:
+            return
+        if prior and value and prior != value:
+            raise SystemExit(
+                f"{name()}: {label} appears twice with different values "
+                f"({prior!r} and {value!r}). Keep one and run again."
+            )
+        site[field] = value
+
     def flush_multi():
         nonlocal current_multi, buffer
         if current_multi:
-            site[current_multi] = clean("\n".join(buffer), f"{where} {current_multi}")
+            put(current_multi, clean("\n".join(buffer), f"{where} {current_multi}"), current_multi)
         current_multi, buffer = None, []
 
     for raw in lines:
         line = raw.rstrip("\r\n")
         m = LABEL_RE.match(line)
         label = m.group(1).strip() if m else None
+
+        if label and label not in MULTI and label not in SINGLE and current_multi is None:
+            NOTES.append(f": ignored unrecognised label {label!r}")
+            continue
 
         if label in MULTI:
             flush_multi()
@@ -101,7 +129,7 @@ def parse_block(lines, where):
                 links.append(pending_link)
                 pending_link = {}
             else:
-                site[field] = value
+                put(field, value, label)
             continue
 
         if current_multi is not None:
@@ -115,8 +143,14 @@ def parse_block(lines, where):
         l for l in links if l.get("label", "").strip() and l.get("url", "").strip()
     ]
 
+    # A map link is one URL; browsers need the https:// that copies often lose.
+    url = (site.get("googleMapUrl") or "").split()
+    if url:
+        url = url[0]
+        site["googleMapUrl"] = url if re.match(r"https?://", url) else "https://" + url
+
     # Blank means "unknown"; numbers become numbers.
-    name = site.get("shortTitle") or site.get("title") or where
+    site_name = name()
     for field in list(site):
         value = site[field]
         if isinstance(value, str) and value.strip() == "":
@@ -125,12 +159,12 @@ def parse_block(lines, where):
             try:
                 site[field] = int(str(site[field]).strip())
             except ValueError:
-                raise SystemExit(f"{name}: {field} must be a whole year, got {value!r}")
+                raise SystemExit(f"{site_name}: {field} must be a whole year, got {value!r}")
         if field in FLOAT and site[field] is not None:
             try:
                 site[field] = float(str(site[field]).strip())
             except ValueError:
-                raise SystemExit(f"{name}: {field} must be a number, got {value!r}")
+                raise SystemExit(f"{site_name}: {field} must be a number, got {value!r}")
     return site
 
 
@@ -155,6 +189,8 @@ def to_json_site(site, ident):
     if site.get("fullHistory"):
         out["fullHistory"] = site["fullHistory"]
     out["archiveLinks"] = site.get("archiveLinks", [])
+    if site.get("googleMapUrl"):
+        out["googleMapUrl"] = site["googleMapUrl"]
     if not out["thenImage"]:
         del out["thenImage"]
     return out

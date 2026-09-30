@@ -110,6 +110,8 @@ WHAT EACH LABEL MEANS
                       of the game until they are filled in.
   THEN PHOTO          File name of the old photo.
   NOW PHOTO           File name of the present-day photo.
+  GOOGLE MAP          Link to the site on Google Maps. Not shown to
+                      players yet; kept for reference.
   ARCHIVE LINK        Text and web address of the PastPerfect search shown
                       under "More historical images". Add another pair of
                       lines for a second link.
@@ -140,6 +142,7 @@ def block(number, site, note=None):
         f"LONGITUDE: {fmt(site.get('lng'))}",
         f"THEN PHOTO: {fmt(site.get('thenImage'))}",
         f"NOW PHOTO: {fmt(site.get('nowImage'))}",
+        f"GOOGLE MAP: {fmt(site.get('googleMapUrl'))}",
     ]
     links = site.get("archiveLinks") or [{"label": "", "url": ""}]
     for link in links:

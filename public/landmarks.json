@@ -3,8 +3,8 @@
     "id": 1,
     "title": "The Hotel Hershey",
     "shortTitle": "Hotel Hershey",
-    "photoYear": null,
-    "nowYear": null,
+    "photoYear": 1938,
+    "nowYear": 2026,
     "lat": 40.299722,
     "lng": -76.659722,
     "hint": "There are two reflecting pools behind this building that used to be the town water supply, each 13 feet and holding 1 million of gallons of water combined.\n\nThe property has been expanded greatly over the years.\n\nA “hill climb” car race was held behind it for many years.",
@@ -19,13 +19,14 @@
         "label": "Search the Historical Society archive",
         "url": "https://hersheyhistory.pastperfectonline.com/bysearchterm?keyword=Hotel%20Hershey"
       }
-    ]
+    ],
+    "googleMapUrl": "https://www.google.com/maps/place/40%C2%B017'59.0%22N+76%C2%B039'35.0%22W/@40.2992542,-76.6616306,448a,35y,19.18h,16.6t/data=!3m1!1e3!4m4!3m3!8m2!3d40.29972!4d-76.65972?entry=ttu&g_ep=EgoyMDI2MDkyNy4xIKXMDSoASAFQAw%3D%3D"
   },
   {
     "id": 2,
     "title": "Route 743 and Cocoa Avenue",
     "shortTitle": "743 & Cocoa",
-    "photoYear": null,
+    "photoYear": 1929,
     "nowYear": null,
     "lat": 40.267189,
     "lng": -76.647889,
@@ -41,13 +42,14 @@
         "label": "Search the Historical Society archive",
         "url": "https://hersheyhistory.pastperfectonline.com/AdvancedSearch?advanceSearchActivated=False&firstTimeSearch=False&search_include_photos=true&search_include_creators=true&search_include_people=true&search_include_containers=true&searchcat_1=&searchcat_2=&searchcat_3=&searchcat_4=&searchcat_5=743+cocoa&searchcat_6=&searchcat_7=&searchcat_8=&searchcat_9=&searchcat_10=&searchcat_11=&searchcat_12=&actionType=Search"
       }
-    ]
+    ],
+    "googleMapUrl": "https://www.google.com/maps/place/232+Peach+Ave,+Hershey,+PA+17033/@40.2687882,-76.6488467,654a,35y,98.05h/data=!3m1!1e3!4m6!3m5!1s0x89c8bb57438289b3:0x3c4482f646d1f67a!8m2!3d40.2678894!4d-76.6519805!16s%2Fg%2F11c194s5_k!5m1!1e4?entry=ttu&g_ep=EgoyMDI2MDkyNy4xIKXMDSoASAFQAw%3D%3D"
   },
   {
     "id": 3,
     "title": "The State Police Academy",
     "shortTitle": "Police Academy",
-    "photoYear": null,
+    "photoYear": 1955,
     "nowYear": null,
     "lat": 40.280889,
     "lng": -76.646667,
@@ -63,13 +65,14 @@
         "label": "Search the Historical Society archive",
         "url": "https://hersheyhistory.pastperfectonline.com/AdvancedSearch?advanceSearchActivated=False&firstTimeSearch=False&search_include_photos=true&search_include_creators=true&search_include_people=true&search_include_containers=true&searchcat_1=&searchcat_2=&searchcat_3=&searchcat_4=&searchcat_5=police+academy&searchcat_6=&searchcat_7=&searchcat_8=&searchcat_9=&searchcat_10=&searchcat_11=&searchcat_12=&actionType=Search"
       }
-    ]
+    ],
+    "googleMapUrl": "https://google.com/maps/place/40°16'51.2\"N+76°38'48.0\"W/@40.2808949,-76.6468364,123a,86.4y,31.95h,103.6t/data=!3m7!1e1!3m5!1sVq7TcBTPpEpupmXA5NGoqg!2e0!6shttps:%2F%2Fstreetviewpixels-pa.googleapis.com%2Fv1%2Fthumbnail%3Fcb_client%3Dmaps_sv.tactile%26w%3D900%26h%3D600%26pitch%3D-13.602522506223906%26panoid%3DVq7TcBTPpEpupmXA5NGoqg%26yaw%3D31.946070142163673!7i13312!8i6656!4m4!3m3!8m2!3d40.28089!4d-76.64667?entry=ttu&g_ep=EgoyMDI2MDkyNy4xIKXMDSoASAFQAw%3D%3D"
   },
   {
     "id": 4,
     "title": "The Hocker House",
     "shortTitle": "Hocker House",
-    "photoYear": null,
+    "photoYear": 1899,
     "nowYear": null,
     "lat": 40.273068,
     "lng": -76.655938,
@@ -84,6 +87,7 @@
         "label": "Search the Historical Society archive",
         "url": "https://hersheyhistory.pastperfectonline.com/advancedsearch?utf8=%E2%9C%93&advanceSearchActivated=true&firstTimeSearch=true&search_include_objects=true&search_include_archives=true&search_include_library=true&search_include_photos=true&search_include_creators=true&search_include_people=true&search_include_containers=true&searchcat_1=&searchcat_2=&searchcat_3=&searchcat_4=&searchcat_5=&searchcat_6=&searchcat_7=&searchcat_8=&searchcat_9=&searchcat_10=&searchcat_11=&searchcat_12=%22HOUSE+%2F+HOCKER%22&searchButton=Search"
       }
-    ]
+    ],
+    "googleMapUrl": "https://www.google.com/maps/place/40%C2%B016'23.1%22N+76%C2%B039'21.4%22W/@40.2731129,-76.6559244,133a,60y,22.94h,94.72t/data=!3m7!1e1!3m5!1scVb9bK_76I_OPbBa2b1QKg!2e0!6shttps:%2F%2Fstreetviewpixels-pa.googleapis.com%2Fv1%2Fthumbnail%3Fcb_client%3Dmaps_sv.tactile%26w%3D900%26h%3D600%26pitch%3D-4.723618126019431%26panoid%3DcVb9bK_76I_OPbBa2b1QKg%26yaw%3D22.9433599979519!7i16384!8i8192!4m4!3m3!8m2!3d40.27307!4d-76.65594?entry=ttu&g_ep=EgoyMDI2MDkyNy4xIKXMDSoASAFQAw%3D%3D"
   }
 ]
